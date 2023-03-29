@@ -2,21 +2,20 @@
 clear; close all; clc;
 
 %% Data analysis parameters
-comparisons=3; % stat analysis
 numsurr=100; % number of surrogates
-perc_GC_GI=[5 50 95];
-perc_GA=[2.5 50 97.5];
+perc_GC_GI=[5 50 95]; % percentiles for GC and GI surrogates
+perc_GA=[2.5 50 97.5]; % percentiles for GA surrogates
 
-nfft=1000; %number of points on frequency axis 
-pfilter=0.94; %filter parameter for detrending
+nfft=1000; % number of points on frequency axis 
+pfilter=0.94; % filter parameter for detrending
 q=20; % number of lags for corr functions
-p=7; % model order (fixed for the representative subject)
+p=7; % model order (fixed for the representative example)
 rangeLF1=[0.02 0.07]; % VLF band
 rangeLF2=[0.07 0.2]; % LF band
 
 idata=[3 4]; % 3) MAP; 4) CBFV 
-t=2; % target
-d=1; % driver
+t=2; % target index
+d=1; % driver index
 
 % plot parameters
 col1=[192 0 0]./255;
@@ -27,15 +26,9 @@ axislinewidth=0.5;
 %% load data
 load('data.mat');
 So=data(:,idata);
-[N,M]=size(So);
-            
-% computation of time domain variables
-mean_map=mean(So(:,d)); 
-mean_f=mean(So(:,t));
-var_map=var(So(:,d));
-var_f=var(So(:,t));
+M=size(So,2);
 
-% sampling frequency 
+% sampling frequency as the inverse of the heart period HP
 HP=data(:,1); 
 fs=1/mean(HP);
 % select spectral band of interest
@@ -46,19 +39,19 @@ band2=round((nfft*2/fs)*rangeLF2);
 Sf=nan*ones(size(So,1),M);
 S=Sf;
 for m=1:M
-    Sf(:,m)=GC_GI_GA_ARfilter(So,m,pfilter); % AR highpass filtered series
+    Sf(:,m)=GICA_ARfilter(So,m,pfilter); % AR highpass filtered series
     S(:,m)=Sf(:,m)-mean(Sf(:,m)); % zero-mean series
 end
             
-%%  IDENTIFICATION OF THE 2AR (full) LINEAR MODEL
+%%  IDENTIFICATION OF THE FULL LINEAR MODEL
 jv=[1 2]; % index of predicted series 
 iv=[1 2]; % indexes of predictors 
 iv_lags=(1:p); % lags of predictors
-outARX=GC_GI_GA_LinReg(S,jv,iv,iv_lags);
+outARX=GICA_LinReg(S,jv,iv,iv_lags);
 Am=outARX.eA; Su=outARX.es2u; % estimated ARX parameters
 
 %% get GC, GI and GA measures in time and frequency domains
-ret = GC_GI_GA_computation(Am',Su,t,d,q,nfft,fs);
+ret = GICA_computation(Am',Su,t,d,q,nfft,fs);
 f=ret.f; % frequency axis
 
 F_XY=ret.F_XY; % Granger Causality GC
@@ -76,7 +69,7 @@ F_Y_band2=sum(f_Y(band2(1):band2(2)))/nfft;
 A_Y_band1=sum(a_Y(band1(1):band1(2)))/nfft;
 A_Y_band2=sum(a_Y(band2(1):band2(2)))/nfft;
 
-% Decomposition of spectrum (full 2AR model) 
+% Decomposition of spectrum of the full model
 P=ret.P; % spectral matrix
 P_t = abs(squeeze(P(t,t,:))); % target spectrum 
 P_d = abs(squeeze(P(d,d,:))); % driver spectrum
@@ -95,6 +88,7 @@ f_Y_s=out.f_Y_s; % this is the vector of percentiles (for each freq. point)
 F_XY_band_s=out.F_XY_band_s; % freq GC 
 A_Y_band_s=out.A_Y_band_s; % freq GA 
 F_Y_band_s=out.F_Y_band_s; % freq GI 
+
 % exctract information in band:
 A_Y_band1_s=A_Y_band_s(1,:); A_Y_band2_s=A_Y_band_s(2,:);
 F_XY_band1_s=F_XY_band_s(1,:); F_XY_band2_s=F_XY_band_s(2,:);
