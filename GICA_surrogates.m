@@ -4,8 +4,8 @@ function out=GICA_surrogates(S,t,d,p,Fs,band_all,numsurr,perc_GC_GI,perc_GA,q,nf
 % S --- time series NxM (N = length; M = no. of series)
 % t --- target series
 % d --- driver series
-% p --- model order subject-specific
-% Fs --- sampling freq subject-specific
+% p --- model order (subject-specific for experimental data)
+% Fs --- sampling freq (subject-specific for experimental data)
 % band_all --- frequency bands of interest - each band is in a row
 %               if one does not want to compute freq. measures, specify band_all = 0
 % numsurr --- no. of surrogates
@@ -14,7 +14,7 @@ function out=GICA_surrogates(S,t,d,p,Fs,band_all,numsurr,perc_GC_GI,perc_GA,q,nf
 % nfft --- no. of points (positive frequencies)
 
 %%% OUTPUT
-% out structure with prctiles of F_XY and A_Y (time and frequency measures)
+% out structure with prctiles of F_XY, F_Y and A_Y (time and frequency measures)
 
 %% check input
 if nargin < 11, nfft = 1000; end
@@ -107,10 +107,10 @@ end
 for k = 1:numsurr
     % resampling of the AR residuals 
     % P = randperm(N) returns a vector containing a random permutation of the
-    % integers 1:N.  For example, randperm(6) might be [2 4 5 6 1 3].
+    % integers 1:N. For example, randperm(6) might be [2 4 5 6 1 3].
     l=length(U_GA);
     idx = randperm(l);
-    U_surr_GA=U_GA(idx,:); % same resampling for the two series
+    U_surr_GA=U_GA(idx,:); % same resampling for the two noise processes
     U_surr_GC=U_GC(idx,:); 
 
     %%% GA surrogates

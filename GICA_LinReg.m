@@ -25,11 +25,12 @@ My=data((maxlag+1:N)',jv); % observation matrix of the predicted variables
 MX=[];% observation matrix of the predictors
 for l=1:length(iv_lags)
     for k=1:length(iv)
-        MX=[MX data(maxlag+1-iv_lags(l):N-iv_lags(l),iv(k))];
+        MX=[MX data(maxlag+1-iv_lags(l):N-iv_lags(l),iv(k))]; %#ok
     end
 end
 
-eA=inv(MX'*MX)*MX'*My; % coefficients (least squares)
+% coefficients (least squares) 
+eA=inv(MX'*MX)*MX'*My; %#ok
 eu=My-MX*eA; % residuals
 es2u=cov(eu); %covariance of residuals
 es2y=cov(My); %covariance of predicted variables

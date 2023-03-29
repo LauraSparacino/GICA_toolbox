@@ -13,10 +13,8 @@ function ret = GICA_computation(Am,Su,t,d,q,nfft,Fs)
 %   starting from the spectral representation of the above 2AR model (full) 
 %   and the spectral representation of the following 2AR model containing
 %   a restricted regression of Y on X (X model):
-%   X_n = A_xx(z)*X_{n-k} + A_xy(z)*Y_{n-k} + U_x|xy (*)
-%   Y_n = B_yx(z)*X_{n-k} + ............... + U_y|x
-%   In this restricted model, we assume S=[X Y], i.e. X-driver is
-%   indicated by index 1 and Y-target by index 2
+%   Y_n = B_yx(z)*X_{n-k} + ............... + U_y|x (*)
+%   X_n = A_xx(z)*X_{n-k} + A_xy(z)*Y_{n-k} + U_x|xy  
 
 %   INPUT: 
 %   Am  -   generalized connectivity matrix A=(A_1 A_2 ... A_p)
@@ -28,7 +26,7 @@ function ret = GICA_computation(Am,Su,t,d,q,nfft,Fs)
 %   Fs - sampling frequency
 %   OUTPUT:
 %   ret structure with all possible conditional entropies,
-%   frequency-specific Granger autonomy and Granger causality
+%   time- and frequency-specific GC, GI and GA
 
 M = size(Am,1); % number of elements in system
 assert(M==2); % this is bivariate analysis, error if M~=2
@@ -155,17 +153,19 @@ Hx_XpastYpast=0.5*log(Sx_XpastYpast)+0.5*log(2*pi*exp(1));
 
 %% PART 3: RESTRICTED MODEL of Y (X model) & FULL MODEL of X (ARX model) --- (*)
 % extract coefficients and partial variances related to the model (*):
-%   X_n = A_xx(z)*X_{n-k} + A_xy(z)*Y_{n-k} + U_x|xy
 %   Y_n = B_yx(z)*X_{n-k} + ............... + U_y|x
-    
-%%%%% UPDATE indices of target & driver to refer to (*)
-t_restricted=2; d_restricted=1;
+%   X_n = A_xx(z)*X_{n-k} + A_xy(z)*Y_{n-k} + U_x|xy
 
 B = SyXpast / SXpast ;
 B=B(1:p); % coefficients X --> Y (X model)
+
 % Sy_Xpast -- partial variance of X model (X-->Y) 
 % Sx_XpastYpast -- partial variance of ARX model (X,Y-->X) 
-S_tilde_r=[Sx_XpastYpast 0; 0 Sy_Xpast];
+if t==1
+    S_tilde_r=[Sy_Xpast 0; 0 Sx_XpastYpast];
+else
+    S_tilde_r=[Sx_XpastYpast 0; 0 Sy_Xpast];
+end
 
 for n=1:nfft 
     %%% Coefficient matrix in the frequency domain
@@ -173,21 +173,27 @@ for n=1:nfft
     Bs = 0; % matrix Bs(z)=sum(B(k))
     for k = 1:p+1
         As = As + A(:,k*M+(1-M:0))*exp(-z*(k-1)*f(n));
-        % indicization (:,k*M+(1-M:0)) extracts the k-th M*M block from the matrix B
-        % (A(1) is in the second block, and so on)
+        % indicization (:,k*M+(1-M:0)) extracts the k-th M*M block from the
+        % matrix A (A(1) is in the second block, and so on)
     end
     for k = 1:p
         Bs = Bs + B(k)*exp(-z*(k)*f(n));
     end
 
-    AB=[As(d,[d t]); -Bs 1]; % transfer matrix for restricted model
+    % build transfer matrix G for restricted model
+    if t==1
+        AB=[1 -Bs; As(d,[t d])]; 
+    else
+        AB=[As(d,[d t]); -Bs 1]; 
+    end
+
     G(:,:,n)  = inv(AB);
     P_r(:,:,n)  = G(:,:,n)*S_tilde_r*G(:,:,n)'; 
 
     % "causal" part of the spectrum P_r:
-    caus_r(n)=Sx_XpastYpast*abs(G(t_restricted,d_restricted,n))^2;
+    caus_r(n)=Sx_XpastYpast*abs(G(t,d,n))^2;
     % "autonomous" part of the spectrum P_r:
-    aut_r(n)=Sy_Xpast*abs(G(t_restricted,t_restricted,n))^2;
+    aut_r(n)=Sy_Xpast*abs(G(t,t,n))^2;
 
 end
 
@@ -222,15 +228,15 @@ end
 %% PART 5: GRANGER AUTONOMY & CAUSALITY
 for n=1:nfft
 
-    % SPECTRAL GC --- Geweke formulation (without 1/2)
+    % SPECTRAL GC 
     gc_freq(n)=log(abs(P_f(t,t,n))./aut_f(n)); 
     gi_freq(n)=log(abs(P_f(t,t,n))./caus_f(n));
 
     % SPECTRAL GA
     num=Sy_Xpast*abs(H(t,t,n))^2;
-    den=Sy_YpastXpast*abs(G(t_restricted,t_restricted,n))^2;
+    den=Sy_YpastXpast*abs(G(t,t,n))^2;
     ga_freq_all(n)=log(num./den); 
-    ga_freq_variable(n)=log((abs(H(t,t,n))^2)./(abs(G(t_restricted,t_restricted,n))^2));
+    ga_freq_variable(n)=log((abs(H(t,t,n))^2)./(abs(G(t,t,n))^2));
 
 end
 
@@ -255,13 +261,7 @@ ret.Hx_x=Hx_Xpast; ret.Sx_x=Sx_Xpast;
 ret.Hx_y=Hx_Ypast; ret.Sx_y=Sx_Ypast;
 ret.Hx_xy=Hx_XpastYpast; ret.Sx_xy=Sx_XpastYpast; 
 
-%%%% partial spectra of (*) and (**) models
-ret.caus_r=caus_r;
-ret.aut_r=aut_r;
-ret.caus_f=caus_f;
-ret.aut_f=aut_f;
-
-%%%% GRANGER CAUSALITY & AUTONOMY
+%%%% GRANGER CAUSALITY, ISOLATION & AUTONOMY
 % freq
 ret.a_Y_all=ga_freq_all;
 ret.a_Y_variable=ga_freq_variable;
@@ -274,7 +274,7 @@ ret.F_Y=gi_time;
 
 %%%% COEFFICIENTS of restricted X model and TRANSFER FUNCTIONS
 ret.B=B; % restricted X
-ret.Gyy=G(t_restricted,t_restricted,:); % restricted model (X)
+ret.Gyy=G(t,t,:); % restricted model (X)
 ret.Hyy=H(t,t,:); % full model (ARX)
 
 end
