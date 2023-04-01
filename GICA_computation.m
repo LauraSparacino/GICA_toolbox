@@ -39,21 +39,20 @@ if all(size(nfft)==1) % if nfft is scalar
 else % if nfft is a vector, we assume that it is the vector of the frequencies
     f = nfft; nfft = length(nfft);
 end
-% zeta is the variable on the complex plane
-z = 1i*2*pi/Fs;
+
+z_star = 1i*2*pi/Fs; % variable on the complex plane
 
 %% init
 A = [eye(M) -Am]; % build (I-Am)
 G=zeros(M,M,nfft); % Transfer Matrix of (*)
-P_r=zeros(M,M,nfft); % Spectral Matrix of (*)
 H=zeros(M,M,nfft); % Transfer Matrix of (**)
 P_f=zeros(M,M,nfft); % Spectral Matrix of (**)
-caus_r=zeros(nfft,1); caus_f=caus_r; % causal spectra
-aut_f=caus_r; aut_r=caus_r; % autonomous spectra
-ga_freq_all=caus_r; % spectral GA - sum of two terms
-ga_freq_variable=caus_r; % spectral GA - term variable in frequency
-gc_freq=caus_r; % spectral GC
-gi_freq=caus_r; % spectral GI
+caus_f=zeros(nfft,1); % causal spectra
+aut_f=caus_f; % autonomous spectra
+ga_freq_all=caus_f; % spectral GA - sum of two terms
+ga_freq_variable=caus_f; % spectral GA - term varying in frequency
+gc_freq=caus_f; % spectral GC
+gi_freq=caus_f; % spectral GI
 
 %% PART 1: COVARIANCE MATRICES
 % prepare covariance matrices, (:,:,1) is lag 0, (:,:,q+1) is lag q 
@@ -157,30 +156,22 @@ Hx_XpastYpast=0.5*log(Sx_XpastYpast)+0.5*log(2*pi*exp(1));
 %   X_n = A_xx(z)*X_{n-k} + A_xy(z)*Y_{n-k} + U_x|xy
 
 B = SyXpast / SXpast ;
-B=B(1:p); % coefficients X --> Y (X model)
-
-% Sy_Xpast -- partial variance of X model (X-->Y) 
-% Sx_XpastYpast -- partial variance of ARX model (X,Y-->X) 
-if t==1
-    S_tilde_r=[Sy_Xpast 0; 0 Sx_XpastYpast];
-else
-    S_tilde_r=[Sx_XpastYpast 0; 0 Sy_Xpast];
-end
+B = B(1:p); % coefficients X --> Y (X model)
 
 for n=1:nfft 
     %%% Coefficient matrix in the frequency domain
     As = zeros(M,M); % matrix As(z)=I-sum(A(k))
     Bs = 0; % matrix Bs(z)=sum(B(k))
     for k = 1:p+1
-        As = As + A(:,k*M+(1-M:0))*exp(-z*(k-1)*f(n));
+        As = As + A(:,k*M+(1-M:0))*exp(-z_star*(k-1)*f(n));
         % indicization (:,k*M+(1-M:0)) extracts the k-th M*M block from the
         % matrix A (A(1) is in the second block, and so on)
     end
     for k = 1:p
-        Bs = Bs + B(k)*exp(-z*(k)*f(n));
+        Bs = Bs + B(k)*exp(-z_star*(k)*f(n));
     end
 
-    % build transfer matrix G for restricted model
+    % build transfer matrix G for restricted model (*)
     if t==1
         AB=[1 -Bs; As(d,[t d])]; 
     else
@@ -188,19 +179,15 @@ for n=1:nfft
     end
 
     G(:,:,n)  = inv(AB);
-    P_r(:,:,n)  = G(:,:,n)*S_tilde_r*G(:,:,n)'; 
-
-    % "causal" part of the spectrum P_r:
-    caus_r(n)=Sx_XpastYpast*abs(G(t,d,n))^2;
-    % "autonomous" part of the spectrum P_r:
-    aut_r(n)=Sy_Xpast*abs(G(t,t,n))^2;
 
 end
 
 %% PART 4: FULL MODEL (2AR) (**)
-% extract partial variances
-% Sy_YpastXpast -- partial variance of 2AR model (X,Y-->Y)
-% Sx_XpastYpast -- partial variance of 2AR model (X,Y-->X)
+
+% extract the partial variances:
+% -- Sy_YpastXpast -- partial variance of 2AR model (X,Y-->Y)
+% -- Sx_XpastYpast -- partial variance of 2AR model (X,Y-->X)
+% to build the covariance matrix of the full model (**):
 if t==1
     S_tilde_f=[Sy_YpastXpast 0; 0 Sx_XpastYpast];
 else
@@ -211,7 +198,7 @@ for n=1:nfft
     %%% Coefficient matrix in the frequency domain
     As = zeros(M,M); % matrix As(z)=I-sum(A(k))
     for k = 1:p+1
-        As = As + A(:,k*M+(1-M:0))*exp(-z*(k-1)*f(n));
+        As = As + A(:,k*M+(1-M:0))*exp(-z_star*(k-1)*f(n));
         % indicization (:,k*M+(1-M:0)) extracts the k-th M*M block from the matrix B
         % (A(1) is in the second block, and so on)
     end
@@ -225,10 +212,10 @@ for n=1:nfft
     aut_f(n)=Sy_YpastXpast*abs(H(t,t,n))^2;
 end
 
-%% PART 5: GRANGER AUTONOMY & CAUSALITY
+%% PART 5: GRANGER AUTONOMY, CAUSALITY & ISOLATION
 for n=1:nfft
 
-    % SPECTRAL GC 
+    % SPECTRAL GC & GI
     gc_freq(n)=log(abs(P_f(t,t,n))./aut_f(n)); 
     gi_freq(n)=log(abs(P_f(t,t,n))./caus_f(n));
 
@@ -241,9 +228,9 @@ for n=1:nfft
 end
 
 % time domain measures
-gc_time=sum(gc_freq)/nfft; %GC
-gi_time=sum(gi_freq)/nfft; %GI
-ga_time=sum(ga_freq_all)/(nfft); %GA
+gc_time=sum(gc_freq)/nfft; % GC
+gi_time=sum(gi_freq)/nfft; % GI
+ga_time=sum(ga_freq_all)/(nfft); % GA
 
 %% OUTPUTs
 ret.f=f;

@@ -8,7 +8,7 @@ perc_GA=[2.5 50 97.5]; % percentiles for GA surrogates
 
 nfft=1000; % number of points on frequency axis 
 pfilter=0.94; % filter parameter for detrending
-q=20; % number of lags for corr functions
+q=20; % number of lags for computing autocorrelation functions
 p=7; % model order (fixed for the representative example)
 rangeLF1=[0.02 0.07]; % VLF band
 rangeLF2=[0.07 0.2]; % LF band
@@ -25,8 +25,8 @@ axislinewidth=0.5;
 
 %% load data
 load('data.mat');
-So=data(:,idata);
-M=size(So,2);
+So=data(:,idata); % extract the series
+M=size(So,2); % this is bivariate analysis
 
 % sampling frequency as the inverse of the heart period HP
 HP=data(:,1); 
@@ -94,7 +94,7 @@ A_Y_band1_s=A_Y_band_s(1,:); A_Y_band2_s=A_Y_band_s(2,:);
 F_XY_band1_s=F_XY_band_s(1,:); F_XY_band2_s=F_XY_band_s(2,:);
 F_Y_band1_s=F_Y_band_s(1,:); F_Y_band2_s=F_Y_band_s(2,:);
 
-% count number of significant measures
+% count number of significant values
 %%%% granger autonomy
 if A_Y > A_Y_s(3); A_Y_count_surr=1;
 else; A_Y_count_surr=0; end
@@ -115,7 +115,7 @@ if F_XY_band1 > F_XY_band1_s(3); F_XY_band1_count_surr=1;
 else; F_XY_band1_count_surr=0; end
 if F_XY_band2 > F_XY_band2_s(3); F_XY_band2_count_surr=1;
 else; F_XY_band2_count_surr=0; end
-%%% granger non-causality
+%%% granger isolation
 if F_Y < F_Y_s(1); F_Y_count_surr=1;
 else; F_Y_count_surr=0; end
 if F_Y_band1 < F_Y_band1_s(1); A_Y_band1_count_surr=1;
@@ -216,7 +216,7 @@ if isholdonque == 0
 hold off
 end
 
-spl{5}=subplot(2,5,4);
+spl{5}=subplot(2,5,4); % GC
 area(f,f_XY_s(:,3),'FaceColor',[0.9 0.9 0.9], ...
     'HandleVisibility','off'); hold on;
 area(f,f_XY_s(:,1),'FaceColor',[1 1 1], ...
@@ -228,7 +228,7 @@ plot(f,f_XY_s(:,3),'LineWidth',1,'Color',[0.5 0.5 0.5],...
 plot(f,f_XY_s(:,2),'LineWidth',1.5,'Color',[0.2 0.2 0.2],...
     'HandleVisibility','off'); hold on;  % 50° perc
 plot(f,f_XY,'Color',[0.4660 0.6740 0.1880], ...
-    'LineWidth',2); hold on; % granger causality
+    'LineWidth',2); hold on; 
 xticks([]); 
 xlim([0 0.5]);
 yticks([0 1 2 3])
@@ -250,7 +250,7 @@ end
 text(0,ax.YLim(2)+((ax.YLim(2)-ax.YLim(1))/10),...
     'C','FontWeight','bold','FontSize',DimensioneFont+2)
 
-spl{6}=subplot(2,5,9);
+spl{6}=subplot(2,5,9); % GI
 area(f,f_Y_s(:,3),'FaceColor',[0.9 0.9 0.9], ...
     'HandleVisibility','off'); hold on;
 area(f,f_Y_s(:,1),'FaceColor',[1 1 1], ...
@@ -262,7 +262,7 @@ plot(f,f_Y_s(:,3),'LineWidth',1,'Color',[0.5 0.5 0.5], ...
 plot(f,f_Y_s(:,2),'LineWidth',1.5,'Color',[0.2 0.2 0.2], ...
     'HandleVisibility','off'); hold on; % 50° perc
 plot(f,f_Y,'-','Color',[0.3010 0.7450 0.9330], ...
-    'LineWidth',2); hold on; % non granger causality
+    'LineWidth',2); hold on; 
 xlabel('{\it f}[Hz]');
 xticks(0:0.1:fs/2);
 xlim([0 0.5]);
@@ -284,7 +284,7 @@ if isholdonque == 0
 hold off
 end
 
-spl{7}=subplot(2,5,[5 10]);
+spl{7}=subplot(2,5,[5 10]); % GA
 area(f,a_Y_s(:,3),'FaceColor',[0.9 0.9 0.9], ...
     'HandleVisibility','off'); hold on;
 area(f,a_Y_s(:,1),'FaceColor',[0.9 0.9 0.9], ...
